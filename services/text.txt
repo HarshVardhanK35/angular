@@ -1,0 +1,238 @@
+// SERVICES AND DEPENDENCY INJECTION
+------------------------------------
+
+in this section.. 
+    1. revisit services
+    2. revisit dependency injection
+    3. hierarchical injectors and DI resolution process
+    4. injection tokens and values
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+176. Service?
+-------------
+
+? WHAT IS A SERVICE ?
+-----
+- services allow us to SHARE LOGIC and DATA across application
+- act like a centralized services.. which are injected into multiple components / directives / other services
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+177. Creating a Service
+-----------------------
+- create a new file tasks/tasks.service.ts
+- create a class named: "TasksService" >>> as there is only "Injectable" decorators to make a class as a Service
+
+ex:
+import { Injectable, signal } from "@angular/core";
+
+import { Task } from "./task.model";
+
+@Injectable({
+  providedIn: "root",
+})
+export class TasksService {
+  tasks = signal<Task[]>([])
+
+  addTask(taskData: { title: string, description: string }) {
+
+    const newTask: Task = {
+      id: Math.random().toString(),
+      status: 'OPEN',
+      ...taskData,
+    }
+    this.tasks.update((oldTasks) => {
+      return [...oldTasks, newTask]
+    })
+  }
+}
+
+explanation:
+---
+- @Injectable makes a class a service and it make a class available to inject in other components / directives / other services
+    - configuring @Injectable decorator.. to provide the following class as root into other components
+
+- we used "signal" to make a property "tasks".. which takes an empty array as an argument
+    - as "signal" is a generic type.. it takes Task-Model as model of data that will be stored inside arrays
+
+- we used Task model... it is like this... 
+    export type TaskStatus = 'OPEN' | 'IN_PROGRESS' | 'DONE';
+    export interface Task {
+        id: string;
+        title: string;
+        description: string;
+        status: TaskStatus;
+    }
+
+- created a function which takes in... taskData >>> of type:  title: string, description: string 
+    - to update a signal... we use "update" function... which automatically receives previous tasks 
+    - returns a copy of "oldTasks" with spread-op (...) without mutating old array object in memory but replace it with new array
+---
+TIP
+- when working with arrays.. create a copy of original array with spread operator
+  - instead of mutating the original array!
+---
+
+
+? HOW TO PROVIDE A SERVICE INTO OTHER COMPONENTS / DERIVATIVES / SERVICES
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+178. How NOT To Provide A Service
+---------------------------------
+
+? how to inject a service ?
+-----
+- we can instantiate as service is a class!
+ex: 
+export class NewTaskComponent {
+  private formEl = viewChild<ElementRef<HTMLFormElement>>('form');
+
+  private tasksService: TasksService
+  constructor() {
+    this.tasksService = new TasksService
+  }
+  onAddTask(title: string, description: string) {...}
+}
+
+PROBLEM
+-------
+- this creates separate instances per component 
+- if we want service in another component.. and we have to instantiate there as well
+  - then previous instantiated object will not be available for other component 
+  [if we follow this way.. we had to work with separate objects]
+
+SOLUTION
+--------
+- so we use angular's dependency injection mechanism
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+179. Using Angular's Dependency Injection Mechanism
+---------------------------------------------------
+- angular has built-in feature called "Dependency Injection" >>> means components / directives and services request values that they depend on
+
+- for this angular uses multiple injectors: 
+  - with these we can register services.. 
+
+- we don't create instance on our own! but we use angular injection mechanism
+ex: 
+export class NewTaskComponent {
+  private formEl = viewChild<ElementRef<HTMLFormElement>>('form');
+
+  private tasksService: TasksService
+  constructor(tService: TasksService) {
+    this.tasksService = tService
+  }
+
+  onAddTask(title: string, description: string) {
+    this.formEl()?.nativeElement.reset();
+  }
+}
+
+- create a private property "tasksService" so that component's template will not get access to this property
+- we request service as dependency as a parameter from the "constructor-fun" and type is important which acts like INJECTION TOKEN
+
+---------------
+INJECTION TOKEN
+---------------
+- type serves as injection token.. used by angular to identify parameter as a service.. to create and inject 
+ex: constructor(tService: TasksService){...}
+
+NOTE
+- this creates a common shareable instance for every component across the application
+
+shortcut for... 
+private tasksService: TasksService
+constructor(tService: TasksService) {
+  this.tasksService = tService
+}
+....
+constructor(private tasksService: TasksService) {}
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+180. Using The Alternative Dependency Injection Syntax
+------------------------------------------------------
+- another syntax to inject a service 
+- using "inject()" function with service class as parameter which acts like a "Injection-Token"
+ex: 
+private tasksService = inject(TasksService)
+
+NOTE
+- inject() function imported from "@angular/core" 
+- this returns a type: signal 
+
+ex:
+export class TasksListComponent {
+  selectedFilter = signal<string>('all');
+  
+  // TasksService - INJECTION
+  private tasksService = inject(TasksService) 
+  tasks = this.tasksService.tasks();              // - this is a writable signal but here reading signal is enough
+
+  onChangeTasksFilter(filter: string) {
+    this.selectedFilter.set(filter);
+  }
+}
+
+? HOW TO CONVERT WRITABLE TO READABLE SIGNAL ?
+-----
+- inside TasksService.. 
+---
+export class TasksService {
+  private tasks = signal<Task[]>([])
+  allTasks = this.tasks.asReadonly()
+  ...
+}
+
+- read TasksService..
+---
+export class TasksListComponent {
+  selectedFilter = signal<string>('all');
+
+  private tasksService = inject(TasksService)
+  tasks = this.tasksService.allTasks              //- this returns only readable signal!
+  ...
+}
+
+- accessing tasks inside template
+---
+<ul>
+  @for (task of tasks(); track task) {        // tasks() hence it is signal!
+    <li>
+      <app-task-item [task]="task" />
+    </li>
+  }
+</ul>
+
+- finally update the function to add new tasks in "new-task.component.ts"
+---
+export class NewTaskComponent {
+  private formEl = viewChild<ElementRef<HTMLFormElement>>('form');
+
+  private tasksService: TasksService
+  constructor(tService: TasksService) {
+    this.tasksService = tService
+  }
+
+  onAddTask(title: string, description: string) {
+    this.tasksService.addTask({
+      title: title, description: description
+    })
+    this.formEl()?.nativeElement.reset();
+  }
+}
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+181. Outsourcing & Reusing Logic with Services
+----------------------------------------------
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+182. Angular Has Multiple Injectors!
+----------------------------------------------
+
+
+
+
+

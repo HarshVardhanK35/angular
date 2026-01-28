@@ -1,0 +1,62 @@
+// Angular's Change Detection Mechanism
+---------------------------------------
+in this section:
+  1. what is change detection?
+  2. understanding Angular's change detection mechanism
+  3. using OnPush strategy [for optimizing] 
+  4. change detection and signals [relation]
+  5. going zoneless
+
+NOTE: 
+- theory lecture.. automatically happens behind the scenes
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+195. Understanding How Angular Performs Change Detection
+--------------------------------------------------------
+
+zone.js
+-------
+- a library
+- wraps around every component in an application [includes AppComponent]
+  - this wrapper informs angular about potential events 
+
+Change Detection
+----------------
+- this only runs when there is an event listener set up for a button click 
+
+- therefore
+  - if there is an event occurs, change detection process starts visits every component in entire application
+  - visits every templates and bindings inside these templates.. checks whether a new value (other than what was visible) is being produced or not!
+  - if there is new value.. then angular updates the DOM
+
+debugOutput
+---
+- this getter was added to every component.ts file and also added inside string interpolation of every component's template
+  - therefore, angular checks every bindings inside templates and evaluates the getter function.. and logs that message inside the getter 
+
+- this debugOutput() is added in every component
+ex:
+- html file:
+<p class="debug-output">{{ debugOutput }}</p>
+
+- ts file:  
+get debugOutput() {
+  console.log('[Counter] "debugOutput" binding re-evaluated.');
+  return 'Counter Component Debug Output';
+}
+
+NOTE:
+- with this if we have a button in a component.. then change detection runs from every components and executes!
+- these checks are made twice per application
+
+TIP
+- getters has to be avoided.. if we make expensive calculations in those getters [inside complex applications]
+
+NOTE:
+- we can put checks.. and avoid these executions from every components
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+196. Change Detection During Development: ExpressionChangedAfterChecked Errors
+------------------------------------------------------------------------------

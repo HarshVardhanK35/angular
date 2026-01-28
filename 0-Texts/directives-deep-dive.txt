@@ -1,0 +1,405 @@
+// DIRECTIVES: DEEP-DIVE
+----------------------------------------------------------------------------------------------------------------------
+
+151. Understanding Directives
+-----------------------------
+- directives are "enhancements" for elements (built-in or dev defined components)
+ex: 
+<input name="title" [(ngModel)]="property"/>
+
+NOTE:
+- directives and components are similar but directives do not have their own templates.. but components have!
+- directives are used to change the configuration (prop, attributes), styling or behavior of elements
+
+----------------------------------------------------------------------------------------------------------------------
+
+153. Analyzing a Built-in Attribute Directive: ngModel
+------------------------------------------------------
+ngModel: 
+---
+- used to enhance input, textarea etc., elements 
+- these are used for 2-way binding 
+- listens to every key-stroke and registers into a property every value entered inside that input 
+
+NOTE:
+- these directives also add CSS classes 
+  - these are prefixed with ng- and added by angular
+ex: ng-untouched (before selecting an input box) and ng-touched (after entering into an input box)
+
+SUMMARY:
+- ngModel is helpful for 2-way binding and also for adding CSS classes for dynamic styling
+- it is an ATTRIBUTE DIRECTIVE: as it is used to add as an attribute to input-elements
+
+----------------------------------------------------------------------------------------------------------------------
+
+154. Analyzing a Built-in Structural Directive: ngIf
+----------------------------------------------------
+
+- we use "@if" to conditionally render content
+- but this is used from only angular-17 or newer versions
+ex:
+@if(isAdmin()) {
+  <p>Only Admins can view this!</p>
+}
+
+- but for older versions we have to use STRUCTURAL DIRECTIVE
+- use *ngIf which is a directive.. adding * makes this ngIf as Structural directive
+ex:
+<p *ngIf="condition: boolean">Only Admins can view this!</p>
+
+NOTE
+- even though it is used as an attribute inside <p> it is structural directive
+
+-----
+? differences between STRUCTURAL and ATTRIBUTE ?
+-----
+- STRUCTURAL: changes the structure of DOM (as *ngIf is a condition.. either it renders the element on DOM or not based on the condition)
+- ATTRIBUTE: only change the behavior of elements
+
+ex:
+<p *ngIf="isAdmin()">Only Admins can view this!</p>
+
+NOTE:
+- as directives needed to be imported into angular
+
+-----
+? to unlock the *ngIf ?
+-----
+- import it into component.ts when we use ngIf inside component.html
+
+1. import {NgIf} from "@angular/common"
+2. add inside imports array >> imports: [NgIf]
+
+NOTE: 
+- in modern angular, no more structural directives (but only ngFor and ngIf)
+
+----------------------------------------------------------------------------------------------------------------------
+
+155. Getting Started with Custom Directives
+-------------------------------------------
+
+- to build custom directives: 
+  1. create a file with name: "<feature>.directive.ts"
+  ex: safe-link.directive.ts
+
+  NOTE: 
+  - we can also use CLI to create a directive: 
+    ng g d (OR) ng generate directive
+
+  2. @Directive() decorator must be added to the class 
+  [directives are classes]
+
+  3. configuring @Directive({}) 
+    - use "selector": tells when this directive becomes active
+  
+    3.1 tag selector and attribute selector: 
+      - can use "app-component" or "[appComponent]"
+      - attribute selector is only used to enhance that element on which it is added!
+    ex: 
+    @Directive({selector: "a[appSafeLink]"})
+      - prefixed with "a" >>> so this would be applied to any anchor element with "[appSafeLink]" selector
+
+    3.2 set standalone: true
+
+  4. using the custom directive
+  ex:
+  <a href="https://angular.dev" appSafeLink>Angular Documentation</a>
+  
+  - used inside "learning-resources.html" so import that directive into "learning-resources.ts"
+  import { SafeLinkDirective } from "../safe-link.directive";
+
+  - and add "SafeLinkDirective" into "imports" array of component configuration
+  @Component({
+    ...
+    imports: [SafeLinkDirective],
+  })
+
+directives example
+---
+ex: 
+import { Directive } from "@angular/core";
+
+@Directive({
+  selector: "a[appSafeLink]",
+  standalone: true
+})
+
+export class SafeLinkDirective {
+  constructor() {
+    console.log("Link is safe to use!");
+  }
+}
+
+----------------------------------------------------------------------------------------------------------------------
+
+156. Using Attribute Directives To Change Element Behavior
+----------------------------------------------------------
+
+import { Directive } from "@angular/core";
+
+@Directive({
+  selector: "a[appSafeLink]",
+  standalone: true,
+  host: {
+    '(click)': "onConfirmLeave($event)"   
+  }
+})
+
+export class SafeLinkDirective {
+  onConfirmLeave(event: MouseEvent) {
+    const wantsToLeave = window.confirm("Do you want to leave the page?")
+    if (wantsToLeave) {
+      return
+    }
+    event.preventDefault()
+  }
+}
+
+- we used host: {}
+  - which listens to the "click" event on the host element that is all anchor elements with [appSafeLink] attribute on them
+
+- when click happens..
+  - "onConfirmLeave($event)" will be executed
+  - when clicked.. $event will become "MouseEvent" object! [generated by the browser]
+
+----------------------------------------------------------------------------------------------------------------------
+
+157. Working with Inputs in Custom Directives
+---------------------------------------------
+
+- when we have links like this:
+<a href="https://angular.dev" appSafeLink>Angular Documentation</a>
+
+- but we want a dynamic link: 
+<a href="https://angular.dev/?from=myapp" appSafeLink>Angular Documentation</a>
+
+NOTE
+- here ?from=myapp is added [as this is hardcoded but we need it as dynamic]
+
+-----
+? changing the URLs from the Directives?
+-----
+export class SafeLinkDirective {
+  onConfirmLeave(event: MouseEvent) {
+    const wantsToLeave = window.confirm("Do you want to leave the page?")
+
+    if (wantsToLeave) {
+      const address = (event.target as HTMLAnchorElement).href;               // use semi-colon [mandatory]
+      (event.target as HTMLAnchorElement).href = address + "?from=myapp";
+      return;
+    }
+    event.preventDefault()
+  }
+}
+
+------------
+TYPE-CASTING
+------------
+- convincing typescript that a parameter is of a type.. we use "as"
+ex: (event.target as HTMLAnchorElement)
+
+-----
+? accepting inputs inside directives and changing href dynamically ?
+-----
+- accepting inputs via Input or input() is totally valid
+
+export class SafeLinkDirective {
+  @Input({required: true}) queryParam = "myApp"   // using "myApp" as a fallback here
+
+  onConfirmLeave(event: MouseEvent) {
+    const wantsToLeave = window.confirm("Do you want to leave the page?")
+
+    if (wantsToLeave) {
+      const address = (event.target as HTMLAnchorElement).href;
+      (event.target as HTMLAnchorElement).href = address + "?from=" + this.queryParam;    // dynamically set an input
+      return;
+    }
+    event.preventDefault()
+  }
+}
+
+- sending inputs from components where selector: "a[appSafeLink]" was used
+ex: 
+<a href="https://angular.dev" appSafeLink queryParam="myApp">Angular Documentation</a>
+
+ex: 
+<a href="https://angular.dev" appSafeLink queryParam="myapp-docs-link">Angular Documentation</a>
+<a href="https://academind.com/courses" appSafeLink queryParam="myapp-courses-link">Academind Courses</a>
+
+-----------------------
+property binding syntax
+-----------------------
+[property] = "expression" 
+- we use this when we send an expression into property that we are accepting
+
+property = "string"
+- we do not need this syntax when we are sending hardcoded value
+
+----------------------------------------------------------------------------------------------------------------------
+
+157. Working with Inputs in Custom Directives
+---------------------------------------------
+- using dependency injection to "inject" services into directives
+
+- injecting host reference into directive
+- now this host element reference is used to replace the previous (event.target as HTMLAnchorElement)
+ex: 
+export class SafeLinkDirective {
+
+  @Input({ required: true }) queryParam = "myApp"
+
+  // replacing the type casting that was used
+  private hostRef = inject<ElementRef<HTMLAnchorElement>>(ElementRef)
+
+  onConfirmLeave(event: MouseEvent) {
+    const wantsToLeave = window.confirm("Do you want to leave the page?")
+
+    if (wantsToLeave) {
+      const address = this.hostRef.nativeElement.href;
+      this.hostRef.nativeElement.href = address + "?from=" + this.queryParam;
+      return;
+    }
+    event.preventDefault()
+  }
+}
+
+----------------------------------------------------------------------------------------------------------------------
+
+157. Working with Inputs in Custom Directives
+---------------------------------------------
+
+- to check whether current logged in user is admin or not.. and with that show the content on the DOM
+- now without using @if or *ngIf.. we have to use a custom structural directive
+
+ex:
+export class AuthDirective {                      // created AuthDirective: represents custom structural directive
+  userType = input.required<Permission>()           // accepting input when directive is used.. which will be: "admin" | "user" | "guest"
+  private authService = inject(AuthService)       // injected a service which has status of current logged in user
+
+  constructor() {
+    effect(() => {
+      if (this.authService.activePermission() === this.userType()) {        // checking logged-in-user-type with input user-type
+        console.log("SHOW");
+      }
+      else {
+        console.log("DO NOT SHOW");
+      }
+    })
+  }
+}
+
+--------
+effect()
+- used with signals.. with effect().. angular sets up subscription to activePermission() and userType() 
+  - when either of these two signal values gets changed.. code inside it gets executed
+--------
+
+-----
+? use AuthDirective ?
+-----
+- registering: import the AuthDirective in <>.component.ts when we use in respective <>.component.html
+ex:
+- used AuthDirective inside app.component.html..
+import { AuthDirective } from "./auth/auth.directive";
+imports: [AuthDirective] -- inside imports array as well
+
+- sending input from here to "AuthDirective"
+ex: <p appAuth userType="admin">Only Admins can view this!</p>
+
+NOTE:
+- in the above example, we are just logging "SHOW" and "DO NOT SHOW"
+- yet it is like attribute directive but not the structural directive
+  - as it is not changing the DOM: which is the real meaning of structural directive.. in next topic
+
+----------------------------------------------------------------------------------------------------------------------
+
+160. Building a Custom Structural Directive
+---------------------------------------------
+
+CONTINUATION OF LAST...
+
+BUILDING CUSTOM STRUCTURAL DIRECTIVE --- step-1
+step-1 >>> creating template
+------
+ng-template
+-----------
+- provided by angular.. to use in own component templates
+- used to wrap some content in between <ng-content>...</ng-content>
+- so this content in between will not be shown initially.. but it is controlled when to show on the screen
+ex:
+<ng-template appAuth userType="admin">    // here appAuth is added on the template not on the below content
+  <p>Only Admins can view this!</p>
+</ng-template>
+
+
+NOTE
+- bts ng-directives use ng-template be like a structural directive
+- as structural directives need "*" as prefix to change the DOM.. but ng-template replaces the "*"
+
+step-2 >>> injecting content
+------
+export class AuthDirective {
+  userType = input.required<Permission>()
+  private authService = inject(AuthService)
+
+  private templateRef = inject(TemplateRef)   
+  private viewContainerRef = inject(ViewContainerRef)
+
+  constructor() {
+    effect(() => {
+      if (this.authService.activePermission() === this.userType()) {
+        this.viewContainerRef.createEmbeddedView(this.templateRef)
+      }
+      else {
+        this.viewContainerRef.clear()
+      }
+    })
+  }
+}
+
+BUILDING CUSTOM STRUCTURAL DIRECTIVE --- step-2
+explanation:
+---
+templateRef = inject(TemplateRef)     // - imported from ang/core
+- this tells angular that respective AuthDirective will be used on ng-template
+  - which holds the template with also the content inside it!
+  [gives access to the <ng-template></ng-template> and also the content inside this]
+
+viewContainerRef = inject(ViewContainerRef)     // - imported from ang/core
+- it is the reference to the place inside DOM where the template has to be injected
+
+NOTE:
+- we need both templateRef and viewContainerRef to inject template.. to make a structural-directive
+
+
+>>> if condition met... this.viewContainerRef.createEmbeddedView(this.templateRef)
+- createEmbeddedView() with template-reference inside it.. tells angular to render content inside the DOM
+
+>>> if not... this.viewContainerRef.clear()
+- this clears if there is any template + content rendered [but initially there will not be any content]
+
+
+----------------------------------------------------------------------------------------------------------------------
+
+161. Structural Directives & Syntactic Sugar
+--------------------------------------------
+
+- so now we can replace ng-template with *appAuth
+- as "*" is simply syntactic sugar for ng-template
+
+- to use direct "*" without using ng-template
+
+step-1 >>> set an alias
+------
+export class AuthDirective {
+  userType = input.required<Permission>({alias: "appAuth"})
+  ...
+}
+
+step-2 >>> use alias instead of userType
+------
+<p *appAuth="'admin'" class="protected-content admin">Only Admins can view this!</p>
+<p *appAuth="'user'" class="protected-content unauthenticated">Regular users can view this!</p>
+<p *appAuth="'guest'" class="protected-content authenticated">Guests can view this!</p>
+
+  

@@ -1,0 +1,14 @@
+<form action="" (ngSubmit)="onAddTask()">
+  <p>
+    <label for="title">Title</label>
+    <input type="text" id="title" name="title" [(ngModel)]="enteredTitle">
+  </p>
+  <p>
+    <label for="description">Description</label>
+    <textarea id="description" name="description" [(ngModel)]="enteredText"></textarea>
+
+  </p>
+  <p id="actions">
+    <button>Add Task</button>
+  </p>
+</form>

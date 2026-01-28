@@ -1,0 +1,207 @@
+133. Using The viewChild Signal Function
+----------------------------------------
+- this is signal type syntax and it is available from angular 17.3 version
+- besides viewChild viewChildren signal type function.. which is helpful in selecting multiple elements
+
+private form = viewChild.required<ElementRef<HTMLFormElement>>("form")
+
+onSubmit(){
+    this.form().nativeElement.reset()
+}
+
+--------------------------------------------------------------------------------------------------------------------------------
+134. ViewChild vs ContentChild
+------------------------------
+- @ViewChild and @ViewChildren are decorators which are useful to select the elements from the templates 
+
+What if we used <ng-content/> as a placeholder?
+-----
+- but when <ng-content/> is used to project the content inside a template.. then use ContentChild and ContentChildren to get the 
+access of those projected content inside .ts file
+
+control.html
+---
+<label for="">{{label}}</label>
+<ng-content select="input, textarea" />
+
+new-ticket.html:
+---
+<form action="" id="" (ngSubmit)="onSubmit(titleInput.value, textarea.value)" #form>
+  <app-control label="Title">
+    <input type="text" name="title" id="title" #titleInput #input>
+  </app-control>
+
+  <app-control label="Request">
+    <textarea type="text" name="request" id="request" rows="3" #textarea #input></textarea>
+  </app-control>
+</form>
+
+control.ts:
+---
+export class ControlComponent {
+  @Input({ required: true }) label!: string
+
+  @ContentChild("input") private control ?: ElementRef<HTMLInputElement | HTMLTextAreaElement> 
+
+  onClick() {
+    console.log(this.control);
+  }
+}
+
+summary:
+- we are not accessing templates directly here.. we are using <ng-content/> as a placeholder
+    - where a template gets into this placeholder eventually (indirectly we are selecting a template from a placeholder )
+
+Note:
+- again there are contentChild() and contentChildren() functions when we use signals
+
+syntax:
+---accessing
+private control = contentChild.required<ElementRef<HTMLInputElement | HTMLTextAreaElement>>("input")
+
+---reading
+onClick(){
+    console.log(this.control())
+}
+
+
+--------------------------------------------------------------------------------------------------------------------------------
+135. A Closer Look at Decorator-based Queries & Lifecycle Hooks
+---------------------------------------------------------------
+
+- ngAfterViewInit: which is used only when we are GUARANTEED that we have access to elements that are selected with @ViewChild()
+    - we have to be sure that elements are initialized 1st before using them inside "ngAfterViewInit"
+
+- but if we use ngOnInit.. we get undefined when we access elements with @ViewChild
+
+summary: 
+- when we store things that are selected using @ViewChild() that are only accessible using 
+    - ngAfterViewInit or functions that are used on the templates
+        - but cannot be accessed from ngOnInit because it is still undefined
+
+ex:
+@ViewChild('form') form?: ElementRef<HTMLFormElement>;
+
+ngOnInit() {
+    console.log(this.form?.nativeElement);      // returns: undefined
+}
+
+ngAfterViewInit() {
+    console.log(this.form?.nativeElement);      // returns: exact element 
+}
+
+similar:
+- we have "ngAfterContentInit" to access values inside it when we select elements using @ContentChild and @ContentChildren
+
+ex:
+@ContentChild("input") private control ?: ElementRef<HTMLInputElement | HTMLTextAreaElement> 
+ngAfterContentInit(){
+    console.log(this.control?.nativeElement);
+}
+
+
+--------------------------------------------------------------------------------------------------------------------------------
+137. The afterRender and afterNextRender Lifecycle Functions
+------------------------------------------------------------
+
+- afterRender and afterNextRender refer complete application not single component where they are defined
+    - but hooks with "ng" as prefix works for component specific
+
+afterRender: executes a lot.. where it listens to every future changes in entire application
+afterNextRender: this will be triggered when there is a next change anywhere in entire application
+
+- these allows us to define functions inside of them 
+    - to listen whenever there is a change inside overall application
+
+
+--------------------------------------------------------------------------------------------------------------------------------
+140. TypeScript & Type Models: Repetition
+[main-app: tickets creation and rendering them]
+-----------------------------------------
+
+--------------------------------------------------------------------------------------------------------------------------------
+141. Component Outputs: Repetition
+----------------------------------
+
+--------------------------------------------------------------------------------------------------------------------------------
+142. A Closer Look At Template For Loops
+----------------------------------------
+syntax: 
+---
+<ul>
+    @for(element of elements<Array>; track element.id) {
+        <li>
+            <element />
+        </li>
+    }
+</ul>
+- track: is used to track every element inside that array with a unique field
+
+additional feature:
+---
+1. fallback content when there are no elements inside an array (empty array)
+-----
+@for(element of elements<Array>; track element.id) {
+    <li>
+        <element />
+    </li>
+}@empty{ 
+    <p>No tickets available.</p>
+}
+
+2. utility or helper variables with elements inside @for(){...}
+-----
+- these are used to style elements on basis of the variable that is added beside that element
+@for(element of elements<Array>; track element.id) {
+    <li>
+        <element />: {{odd}}
+    </li>
+}
+- extra variables: odd, even, first, last, count
+
+Note: @for is available only after angular: 17 or newer versions
+    - but for older versions we have to use "ngFor" directive..
+ex: <li *ngFor> 
+
+
+--------------------------------------------------------------------------------------------------------------------------------
+143. Revisiting Inputs & Signals
+--------------------------------
+
+--------------------------------------------------------------------------------------------------------------------------------
+144. Updating Signal Values
+---------------------------
+- when we use a signal value.. we can update those values using "update()"
+
+ex: 
+export class TicketComponent{
+    detailsVisible = input<true | false>(false)
+    onToggleDetails() {
+        this.detailsVisible.update((wasVisible) => !wasVisible)
+    }
+}
+
+note: 
+- set: this is used to set values on signals.. prop.set()
+- read: to read a value from a signal use.. prop()
+
+--------------------------------------------------------------------------------------------------------------------------------
+145. Cross-Component Communication & State Management
+-----------------------------------------------------
+
+
+--------------------------------------------------------------------------------------------------------------------------------
+146. Configuring Component Inputs & Outputs
+-------------------------------------------
+
+--------------------------------------------------------------------------------------------------------------------------------
+147. Two-Way Binding: Repetition
+--------------------------------
+
+
+--------------------------------------------------------------------------------------------------------------------------------
+148. Setting Up Custom Two-Way Binding
+--------------------------------------
+
+
+
