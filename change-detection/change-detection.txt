@@ -18,7 +18,7 @@ NOTE:
 zone.js
 -------
 - a library
-- wraps around every component in an application [includes AppComponent]
+- ZONE wraps around every component in an application [includes AppComponent]
   - this wrapper informs angular about potential events 
 
 Change Detection
@@ -26,33 +26,37 @@ Change Detection
 - this only runs when there is an event listener set up for a button click 
 
 - therefore
-  - if there is an event occurs, change detection process starts visits every component in entire application
+  - if there is any event happens, change detection process starts visits every component in entire application
   - visits every templates and bindings inside these templates.. checks whether a new value (other than what was visible) is being produced or not!
   - if there is new value.. then angular updates the DOM
 
-debugOutput
+debugOutput - getter property
 ---
 - this getter was added to every component.ts file and also added inside string interpolation of every component's template
   - therefore, angular checks every bindings inside templates and evaluates the getter function.. and logs that message inside the getter 
 
-- this debugOutput() is added in every component
+- this debugOutput() is added in every component as shown below
 ex:
 - html file:
-<p class="debug-output">{{ debugOutput }}</p>
+<p class="debug-output">{{ debugOutput }}</p>         // 1. checks on template
 
 - ts file:  
 get debugOutput() {
-  console.log('[Counter] "debugOutput" binding re-evaluated.');
+  console.log('[Counter] "debugOutput" binding re-evaluated.');       // 2. executes getter function
   return 'Counter Component Debug Output';
 }
+- process:
+  - when there is an event occurs, angular visits every template binding and evaluates that respective getter
+  - even if that event occurs in a component.. angular visits every component and executed getter in that component
+  - all logs are logged for twice.. which is every component was visited twice
 
 NOTE:
 - with this if we have a button in a component.. then change detection runs from every components and executes!
-- these checks are made twice per application
+- these checks are made twice per application..
 
 TIP
-- getters has to be avoided.. if we make expensive calculations in those getters [inside complex applications]
-
+- these type of getters has to be avoided.. when we make expensive calculations or perform intensive operations in those getters [inside complex applications]
+  - so we should not use getters for complex operations
 NOTE:
 - we can put checks.. and avoid these executions from every components
 
@@ -60,3 +64,511 @@ NOTE:
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------
 196. Change Detection During Development: ExpressionChangedAfterChecked Errors
 ------------------------------------------------------------------------------
+WHY every component is visited twice each time when we have an event running?
+---
+- this twice execution happens only in development mode but not after we deployed!
+  - changes are detected twice to detect unwanted value changes after change detection execution.. 
+  [runs 2nd cycle to check if there are any value changes (unwanted changes) after 1st cycle of change detection] 
+
+WHAT if we have two values per execution / per change detection cycle?
+----
+ex: 
+export class InfoMessageComponent {
+  get debugOutput() {
+    console.log('[InfoMessages] "debugOutput" binding re-evaluated.');
+    return Math.random()                                                    // this produces two different values per change detection cycle
+  }
+  onLog() {
+    console.log('Clicked!');
+  }
+}
+- this throws an error: "ExpressionChangedAfterItHasBeenCheckedError"
+
+ex >>> changed to previous code:
+get debugOutput() {
+  console.log('[InfoMessages] "debugOutput" binding re-evaluated.');
+  return 'InfoMessage Component Debug Output';
+}
+- with this fixed string > there will not be any potential errors between cycles
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+197. Writing Efficient Template Bindings
+----------------------------------------
+OPTIMIZATION-1
+---
+-  we should not put expensive calculations inside templates.
+ex: 
+<p class="debug-output">{{ debugOutput }}</p>
+
+- these expressions must be simple.. so should not use events, expensive calculations inside string interpolations
+  - if we use getters inside string interpolation.. that should contain simple calculations
+
+NOTE:
+- that is why pipe transformations are used and the pipe transformed values are cached by default!
+  - pipe are functions too.. which are also executed when templates are executed.. therefore angular caches the results generated with pipes
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+198. Avoiding Zone Pollution
+----------------------------
+OPTIMIZATION-2
+---
+- telling angular that certain event does not matter for change detection
+ex:
+export class CounterComponent implements OnInit{
+  count = signal(0);
+
+  get debugOutput() {
+    console.log('[Counter] "debugOutput" binding re-evaluated.');
+    return 'Counter Component Debug Output';
+  }
+
+  ngOnInit() {
+    setTimeout(() => {
+      this.count.set(0)
+    }, 4000)
+
+    setTimeout(() => {
+      console.log("Timer Expired");
+    }, 5000)
+  }
+  ...
+}
+
+WHEN does change detection executes ?
+---
+- 1. as there is counter.. on updating counter.. change detection runs for twice
+- 2. after setTimeout executes.. which reset the counter.. again change detection runs (2)
+- 3. after 5 seconds as per the above code.. setTimeout runs to log: "Timer Expired" >>> event though it has no impact on the UI 
+  - change detection runs again for two times
+
+HOW to opt-out this behavior ?
+---
+ex:
+setTimeout(() => {
+  console.log("Timer Expired");
+}, 5000)
+
+- this code does not impact the UI.. so to opt-out the change detection
+
+TOOL:
+-----
+- NgZone: which has to be injected
+  - this is service-token which returns a method to opt-out from the zone.js watch mode (for specific code)
+
+- runOutsideAngular() method
+  - which takes a callback.. and code which has no impact on UI
+ex:
+export class CounterComponent implements OnInit {
+
+  private zone = inject(NgZone);                // "NgZone" injected here
+  count = signal(0);
+
+  get debugOutput() {
+    console.log('[Counter] "debugOutput" binding re-evaluated.');
+    return 'Counter Component Debug Output';
+  }
+
+  ngOnInit() {
+    setTimeout(() => {
+      this.count.set(0);
+    }, 4000);
+
+    this.zone.runOutsideAngular(() => {           // wrapping the code which has no impact on the UI
+      setTimeout(() => {
+        console.log('Timer Expired');
+      }, 5000);
+    });
+  }
+  ...
+}
+- this avoids unnecessary change detection cycles after logging: "Timer Expired"
+- therefore this is called "AVOIDING ZONE POLLUTION" with events that don't matter 
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+199. Using the OnPush Strategy
+------------------------------
+OPTIMIZATION-3:
+---
+- "OnPush" strategy
+  - an alternative change detection strategy.. which is an opt-in strategy
+  - which is for per component basis.. which makes sure that change detection runs less often for that component
+
+enabling OnPush strategy?
+---
+- enabling OnPush for "messages" component which has "messages-list" and "new-message" component
+ex: 
+@Component({
+  selector: 'app-messages',
+  standalone: true,
+  templateUrl: './messages.component.html',
+  styleUrl: './messages.component.css',
+  imports: [MessagesListComponent, NewMessageComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush           // added inside configuration
+})
+export class MessagesComponent {...}
+
+- ChangeDetectionStrategy is an "enum" imported from "@angular/core" >>> which has two options: "OnPush" and "Default" 
+  - Default: which is zone's changeDetection-strategy
+  - OnPush: enables OnPush change detection
+
+- with this change detection strategy.. Change detection does not run if there is an event running in other component
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+200. Understanding the OnPush Strategy
+--------------------------------------
+WHAT does OnPush do?
+---
+- if there is an event occurs inside template of MessagesComponent or any event inside it's nested components
+  - OR if there is an input inside component where change detection was set changes
+  [then only change detection runs in these components]
+
+[instead of running change detection if any event occurs inside other components, which is by default.. we avoid it using "OnPush"]
+- this is why "OnPush" is a best change detection strategy
+
+- ChangeDetectionStrategy.OnPush triggers for:
+  - 1. events inside that component
+  - 2. input changes inside that component 
+
+ex: 
+- new-message.html:
+<form (ngSubmit)="onSubmit()">
+  <p>
+    <label for="message">Your Message</label>
+    <textarea id="message" name="message" [(ngModel)]="enteredText"></textarea>
+  </p>
+  <p class="actions">
+    <button>Save</button>
+  </p>
+</form>
+
+<p class="debug-output">{{ debugOutput }}</p>
+
+- new-message.ts:
+@Component({
+  selector: 'app-new-message',
+  standalone: true,
+  imports: [FormsModule],
+  templateUrl: './new-message.component.html',
+  styleUrl: './new-message.component.css',
+  changeDetection: ChangeDetectionStrategy.OnPush,    // OnPush strategy is enabled here
+})
+export class NewMessageComponent {
+  add = output<string>();
+  enteredText = signal('');
+
+  get debugOutput() {
+    console.log('[NewMessage] "debugOutput" binding re-evaluated.');
+    return 'NewMessage Component Debug Output';
+  }
+
+  onSubmit() {
+    this.add.emit(this.enteredText());
+    this.enteredText.set('');
+  }
+}
+
+- whenever text inside input changes.. on every keystroke.. change detection runs 
+  - for every component inside component tree.. it does not stop running change detection for counter-component 
+
+- so to stop changeDetection for counter component as well
+  - then we need to enable inside that counter-component's @Component-decorator
+  - so if any input value changes or any event occurs in counter and it's nested components.. then only changeDetection triggers 
+
+- therefore added this OnPush to every component.. 
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+201. Working with OnPush & Signals
+----------------------------------
+- changes in signals triggers OnPush too.. 
+
+- but using service to share data across OnPush components 
+
+PROBLEM
+- when we work with OnPush and services
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+202. Using Signals for Sharing Data Across Components (with OnPush)
+-------------------------------------------------------------------
+- attached.. messages.service.ts file: 
+ex:
+import { Injectable, signal } from '@angular/core';
+
+@Injectable({
+  providedIn: 'root',
+})
+export class MessagesService {
+  private messages = signal<string[]>([]);
+  allMessages = this.messages.asReadonly();
+
+  addMessage(message: string) {
+    this.messages.update((prevMessages) => [...prevMessages, message]);
+  }
+}
+
+- changed everything to signal based code inside messages related components: messages, new-message, messages-list 
+  - make sure every component has ChangeDetectionStrategy set to OnPush
+
+- next topic: 
+  - changing everything to non-signal based code..
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+203. The Problem With OnPush, Cross-Component Data & Not Using Signals
+----------------------------------------------------------------------
+
+- everything was changed to non-signal based code 
+ex: 
+messages.service.ts
+---
+export class MessagesService {
+  private messages: string[] = []       // previously this was a signal
+  get allMessages() {
+    return [...this.messages]               // this was a signal
+  }
+  addMessage(message: string) {
+    this.messages = [...this.messages, message]
+  }
+}
+
+new-messages accepting component
+---
+export class NewMessageComponent {
+  private messagesService = inject(MessagesService);
+  enteredText = '';
+  get debugOutput() {
+    console.log('[NewMessage] "debugOutput" binding re-evaluated.');
+    return 'NewMessage Component Debug Output';
+  }
+  onSubmit() {
+    this.messagesService.addMessage(this.enteredText);
+    this.enteredText = '';
+  }
+}
+
+messages-list TS component
+---
+export class MessagesListComponent {
+  private messagesService = inject(MessagesService)
+  get messages() {
+    return this.messagesService.allMessages       // changed this to non-signal
+  }
+  get debugOutput() {
+    console.log('[MessagesList] "debugOutput" binding re-evaluated.');
+    return 'MessagesList Component Debug Output';
+  }
+}
+
+messages-list HTML component
+---
+<ul>
+  @for (message of messages; track message) {         // no parenthesis was used here.. hence "messages" is not a signal!
+    <li>{{ message }}</li>
+  }
+</ul>
+<p class="debug-output">{{ debugOutput }}</p>
+
+NOTE:
+- with all this whenever we enter a message and "save" it shall include that entered context into the messages-list
+  - but that will not happen.. listing of messages that were entered does not happen!
+
+CAUSE:
+- MessagesListComponent does not rely on input / signal based code / does not contain any events
+  - if any of them exists in the ts file.. the change detection would trigger automatically!
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+204. Triggering Change Detection Manually & Using RxJS Subjects
+---------------------------------------------------------------
+- if there is no event / no input / no signal based code inside a component.. change detection does not trigger automatically!
+  - so we need to trigger it manually! 
+
+TOOL
+----
+"ChangeDetectorRef" 
+  - imported from "@angular/core"
+  - which is used to inject inside above type of components to trigger change detection manually
+  - this is a service.. we can call a method from it!
+
+WHERE can we call this method?
+---
+- we can call it whenever the data changes [that is inside service.. where data changes with addMessage event]
+  - but we injected inside messages-list.component but not inside messages.service [and we want to trigger manually from messages-list component]
+
+- so we need to notify messages-list component whenever the data changes!
+  - then we can trigger change detection manually inside messages-list component
+
+- to notify a component.. angular uses a 3rd party library [RxJS]
+
+----
+RxJS
+----
+- we use "BehaviorSubject" from RxJS
+  - this allows us a subscription to changes which allows us to trigger events and in turn trigger change detection manually inside messages-list comp.
+
+steps involved
+---
+1. we subscribe to changes from inside messages.service.. import { BehaviorSubject }
+  - this acts as a wrapper around a value and allows us to set up subscriptions to those changes in those values!
+ex: 
+import { BehaviorSubject } from 'rxjs'; >>> which is a signal type 
+
+2. messages$: naming convention
+  - used for rxjs related variables / properties 
+  - and in that initiate "BehaviorSubject" >> which is a signal type!
+ex: 
+messages$ = new BehaviorSubject<string[]>([]);    
+
+3. subscribe to changes 
+  - use the subject: signal that was created "messages$" and call next() on it 
+  - calling "next" as an event which emits new data.. which carries updated data!
+ex:
+addMessage(message: string) {
+  this.messages = [...this.messages, message];
+  this.messages$.next([...this.messages])            // when updated.. next() will be emitted > and carries copy of updated data
+}
+
+Integrating RxJS into te service component
+-----
+export class MessagesService {
+  messages$ = new BehaviorSubject<string[]>([]);
+  private messages: string[] = [];
+
+  get allMessages() {
+    return [...this.messages];
+  }
+  addMessage(message: string) {
+    this.messages = [...this.messages, message];
+    this.messages$.next([...this.messages])
+  }
+}
+
+subscribing to MessagesService from message-list.component.ts
+-----
+export class MessagesListComponent implements OnInit {
+
+  private cdRef = inject(ChangeDetectorRef)               // to trigger change detection manually
+  private messagesService = inject(MessagesService)         // injecting MessageService.. which consists a BehaviorSubject
+
+  messages:string[] = []
+
+  ngOnInit(): void {
+    this.messagesService.messages$.subscribe((messages) => {      // subscribing to BehaviorSubject
+      this.messages = messages;
+      this.cdRef.markForCheck()         // this checks for change.. and triggers change detection manually
+    })
+  }
+  get debugOutput() {
+    console.log('[MessagesList] "debugOutput" binding re-evaluated.');
+    return 'MessagesList Component Debug Output';
+  }
+}
+
+NOTE
+- this.messagesService.messages$.subscribe((messages) => {...})
+  - this brings the updated data from the BehaviorSubject
+
+OPTIONAL
+- sometimes we need to clean up the subscription that we set 
+  - when the component needs to be removed from the application
+
+CLEANING UP THE SUBSCRIPTION 
+---
+1. we need to inject "DestroyRef" into the component where we set up the subscription
+ex: 
+private destroyRef = inject(DestroyRef)
+
+2. use the subscription value that is returned from the subscribe function 
+ex: 
+const subscription = this.messagesService.messages$.subscribe((messages) => {...})
+
+3. destroyRef returns a method: "onDestroy()" 
+  - this takes the value from subscription.. and cleans up the subscription using unsubscribe() method
+
+unSubscribing / cleaning-up the subscription
+-----
+export class MessagesListComponent implements OnInit {
+
+  private cdRef = inject(ChangeDetectorRef)             // injecting destroyRef
+  private destroyRef = inject(DestroyRef)
+  private messagesService = inject(MessagesService)
+
+  messages:string[] = []
+
+  ngOnInit(): void {
+    const subscription = this.messagesService.messages$.subscribe((messages) => {
+      this.messages = messages;
+      this.cdRef.markForCheck()
+    })
+    this.destroyRef.onDestroy(() => {           // using onDestroy.. to use unsubscribe() method
+      subscription.unsubscribe()
+    })
+  }
+  get debugOutput() {
+    console.log('[MessagesList] "debugOutput" binding re-evaluated.');
+    return 'MessagesList Component Debug Output';
+  }
+}
+
+NOTE
+- BehaviorSubject is an observable!
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+205. Introducing The async Pipe
+-------------------------------
+- alternative to ChangeDetectorRef (subscribing) and DestroyRef (cleaning up the subscription) 
+  - without subscribing and unsubscribing an observable
+
+- angular provides a pipe: an async pipe.. this performs
+  - this sets up a subscription, unsubscribe it when that component was destroyed and also triggers changeDetection
+  [everything will be done automatically with ASYNC pipe provided by angular]
+  [changeDetection: triggered automatically whenever a new updated value is emitted]
+
+injecting messages$ into message-list component:
+-----
+export class MessagesListComponent {
+  private messagesService = inject(MessagesService);
+  messages$ = this.messagesService.messages$;           // this returns: BehaviorSubject<string[]>
+
+  get debugOutput() {
+    console.log('[MessagesList] "debugOutput" binding re-evaluated.');
+    return 'MessagesList Component Debug Output';
+  }
+}
+
+using async-pipe to set up a subscription and clean up that subscription, triggers changeDetection automatically
+-----
+1. add AsyncPipe into the imports array inside that component's ts file [unlock the AsyncPipe]
+ex: 
+import {AsyncPipe} from "@angular/common"
+@Component({
+  selector: 'app-messages-list',
+  standalone: true,
+  templateUrl: './messages-list.component.html',
+  styleUrl: './messages-list.component.css',
+  imports: [AsyncPipe],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+export class MessagesListComponent {...}
+
+2. use async pipe while reading values from the "messages$"
+  - syntax: message of messages$ | async; track message.id
+ex:
+@for (message of messages$ | async; track message) {...}
+
+
+----------------------
+Zoneless & Angular 21+
+----------------------
+- to start a project with completed zoneless.. we need flag --no-zoneless
+  - while ng new <project>
+
+- when using signals and event binding syntax.. angular knows when to trigger change-detection
+  - so in this scenarios angular avoid zone.js wrapper!
+
+
