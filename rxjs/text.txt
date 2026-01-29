@@ -1,0 +1,405 @@
+// Working with RxJS (Observables)
+----------------------------------
+in this section: 
+  1. what are observables?
+  2. creating and using observables
+  3. observable operators [to manipulate values created by observables]
+  4. observables vs signals
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+1. what are observables?
+------------------------
+- this concept is from RxJS, which is a 3rd party library 
+  - observables are used inside angular 
+
+OBSERVABLE
+----------
+- this is an object which produces and controls a stream of data 
+
+NOTE
+- RxJS Observables emit values over time.. you can set up subscriptions to handle those emitted values
+
+
+-----------1-------------------------------------------------------------------------------------------------------------------------------------------------
+210. Creating & Using an Observable
+-----------------------------------
+- creating new observable with help of RxJS library without creating a subject
+
+INTERVAL
+--------
+- creates an Observable that emits sequential numbers every specified interval of time!
+
+1. import {interval} from "rxjs"
+2. invoke: interval() => which returns Observable<number>
+  - this produces an Observable of type number
+3. arguments: number => represents milliseconds
+
+subscribing to values that are emitted automatically:
+---
+- interval(1000).subscribe()
+  - this emits values: number for every 1000 ms [automatically]
+  - which can be subscribed with subscribe() method 
+    - subscription: listen to values emitted and use those values which are emitted
+
+observer
+---
+- subscribe consists of an object...
+ex: 
+export class AppComponent implements OnInit {
+  ngOnInit() {
+    interval(1000).subscribe({                // need at least one subscriber.. to run interval / Observable
+      next: (value) => console.log(value),        // - next: fun => runs on every newly emitted value 
+      complete: () => { },                    // - complete: fun => would be called if Observable does not emit any more new values 
+      error: (err) => { }               // - error: fun => this is called if there are any errors 
+    })
+  }
+}
+
+NOTE
+- error:function inside observer is used mostly when handling HTTP requests and response cycles
+
+TIP
+---
+AVOIDING MEMORY LEAKAGE:
+-----
+- store value that is returned from interval inside "subscription"
+  - clean it up using.. unsubscribe() => whenever that component using observer is removed from the DOM
+  [ongoing observable which is not needed anymore]
+
+steps:
+1. inject "DestroyRef" [import "inject" and "DestroyRef" from @ang/core] 
+  - [into component which don't need an Observable any more / if that component would be destroyed from the DOM] 
+2. use .onDestroy() from the DestroyRef to unsubscribe the subscription
+ex:
+export class AppComponent implements OnInit {
+  private destroyRef = inject(DestroyRef)
+  ngOnInit() {
+    const subscription = interval(1000).subscribe({
+      next: (value) => console.log(value),
+    })
+    this.destroyRef.onDestroy(() => {               // - onDestroy hook which clears the subscription!
+      subscription.unsubscribe()
+    })
+  }
+}
+
+SUMMARY
+---
+use-cases: application that something should happen for every couple of seconds
+  - case-1: might send an HTTP request and fetch data for some "X" seconds 
+  - case-2: might update UI element for an animation for every "X" seconds
+
+IMPORTANT
+---
+- if we do not subscribe to an observable at least once.. there will be no values emitted from them
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+211. Working with RxJS Operators
+--------------------------------
+
+Operators
+---------
+- use these when working with observables.. which are functions.. 
+  - use them to pipe into observable data stream to perform transformations / operations on those observable values 
+
+pipe
+----
+- this allows us to add some RxJS-operators into a pipeline
+  - ex: allows us to use map function
+
+MAP: operator => which converts a value that is emitted by an observable
+  - takes in callback.. which is used to execute on every observable value
+  - callback.. gets newly emitted value from observable
+
+ex:
+export class AppComponent implements OnInit {
+  private destroyRef = inject(DestroyRef)
+  ngOnInit() {
+    const subscription = interval(1000).pipe(
+      map((val) => { return val * 2 }),             // map and filter here need to be imported from rxjs
+      filter((val) => val % 4 !== 0)                // want to use more than one operator ? separate them with "comma"
+    ).subscribe({
+      next: (value) => console.log(value),
+    })
+
+    this.destroyRef.onDestroy(() => {
+      subscription.unsubscribe()
+    })
+  }
+}
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+212. Working with Signals
+-------------------------
+SUBJECTS
+--------
+- subjects are also observables
+  - difference: with subjects.. we have to take care of emitting values manually!
+  - [not only subscribe but also emit values manually]
+
+OBSERVABLES
+-----------
+- these have data source and these emit / produces values automatically
+
+ex:
+- using signals...
+// app.component.ts:
+
+export class AppComponent implements OnInit {
+  clickCount = signal(0)
+  private destroyRef = inject(DestroyRef)
+
+  constructor() {
+    effect(() => {
+      console.log(`button is clicked for ${this.clickCount()} times.`);         // effect: runs each time whenever signal inside it updates!
+    })
+  }
+  onClick() {                                                       // update: used to set updated values dynamically! 
+    this.clickCount.update((prevCount) => prevCount + 1)      // update => gets previous value 
+  }
+}
+
+// app.component.html:
+<p>
+  <button (click)="onClick()">Click</button>
+</p>
+<p>
+  {{clickCount()}}
+</p>
+
+SUMMARY
+---
+- signal also looks like a stream of data.. similar to data stream that is produced from subject!
+  - as we are emitting new values => by calling update function
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+213. Signals vs Observables
+---------------------------
+- before introducing signals into angular.. rxjs was used to sharing data and for also managing subscriptions!
+- but with signal.. rxjs would not be needed
+
+- we could use setInterval: an internal fun 
+  - instead of "interval" from rxjs
+
+ex:
+ngOnInit() {
+  setInterval(() => {
+    // update the signal
+  }, 1000)
+}
+
+- but following signal instead of rxjs operators would be more complex
+- with signals of using setInterval.. we need more code to manage data.. with map and filter 
+  - need more code to clean up the interval!
+
+DIFFERENCES 
+-----------
+signals 
+  - value in a container
+  - to get notified about values.. we need to subscribe 
+    - great for managing events and streamed data [where values arrive asynchronously over time]
+
+observables 
+  - values over time [pipeline of values emitted over time]
+  - these are used for managing application's state
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+214. Converting Signals To Observables
+--------------------------------------
+TOOL
+----
+- use "toObservable" function [imported from @ang/core/rxjs-interop]
+ex: 
+clickCount$ = toObservable(this.clickCount)
+
+- instead of using effect to listen for updates 
+  - we can use subscribe()
+
+ex: 
+instead of this... 
+constructor() {
+  effect(() => {
+    console.log(`button is clicked for ${this.clickCount()} times.`);
+  })
+}
+
+we can do this...
+ngOnInit() {
+  this.clickCount$.subscribe()    // we can pass an observer object.. with "next" function we can listen to every newly emitted value
+}
+
+ex: 
+export class AppComponent implements OnInit {
+  clickCount = signal(0)
+  clickCount$ = toObservable(this.clickCount)     // converted signal to an observable
+  private destroyRef = inject(DestroyRef)
+
+  // constructor() {
+  //   effect(() => {
+  //     console.log(`button is clicked for ${this.clickCount()} times.`);    // checking for any updates using effect
+  //   })
+  // }
+  ngOnInit() {
+    const subscription = this.clickCount$.subscribe({
+      next: () => console.log(`button is clicked for ${this.clickCount()} times.`),     // used subscribe to check for updates
+    })
+    this.destroyRef.onDestroy(() => {
+      subscription.unsubscribe()
+    })
+  }
+  onClick() {
+    this.clickCount.update((prevCount) => prevCount + 1)
+  }
+}
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+214. Converting Observables To Signals 
+--------------------------------------
+TOOL
+----
+- toSignal => imported from @ang/core/rxjs-interop
+ex: 
+interval$ = interval(1000)        // which is an observable.. produces a new value for every 1 second 
+intervalSignal = toSignal(this.interval$)     // convert this observable to signal
+
+- now we can also use compute function, use inside template to read values from that signal
+
+ex:
+export class AppComponent implements OnInit {
+  clickCount = signal(0)
+  clickCount$ = toObservable(this.clickCount)
+  
+  interval$ = interval(1000)           // an observable
+  intervalSignal = toSignal(this.interval$)     // converting observable to a signal
+
+  private destroyRef = inject(DestroyRef)
+
+  ngOnInit() {
+    const subscription = this.clickCount$.subscribe({
+      next: () => console.log(`button is clicked for ${this.clickCount()} times.`),
+    })
+    this.destroyRef.onDestroy(() => {
+      subscription.unsubscribe()
+    })
+  }
+  onClick() {
+    this.clickCount.update((prevCount) => prevCount + 1)
+  }
+}
+
+// html
+<p>
+  {{interval$()}}   // reading values: as it is an interval.. it gets updated for every 1second
+</p>
+
+- but initially angular set interval$ value to undefined.. [that's why we don't see any number rendering on page]
+- we can change this by configuring toSignal()
+
+- configuration:
+interval$ = interval(1000)                      // an observable
+intervalSignal = toSignal(this.interval$, {         // converting it to signal
+  initialValue: 0, manualCleanup: true            // adding configuration to change "initialValue" to 0
+})
+
+- manualCleanup is set to "true" => whenever component gets removed  
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+216. Deep Dive: Creating & Using A Custom Observable From Scratch 
+-----------------------------------------------------------------
+- building an observable from scratch.. without observable creation operator like "interval"
+
+1. instantiate "Observable" (imported from rxjs) class to create new Observable
+ex: customInterval$ = new Observable()
+
+2. Observable() takes in a callback.. which has parameter "subscriber" 
+  - define "next" on this subscriber.. which will be executed when we subscribe to this custom observable.. after calling same next function
+
+ex:
+export class AppComponent implements OnInit {
+  interval$ = interval(1000)
+  intervalSignal = toSignal(this.interval$, {
+    initialValue: 0, manualCleanup: true
+  })
+  customInterval$ = new Observable((subscriber) => {        // custom observable set up 
+    setInterval(() => {
+      subscriber.next({ message: "new value" })             // defining "next" which will emit a new value => "message" when subscribed  
+    }, 2000)
+  })
+
+  private destroyRef = inject(DestroyRef)
+
+  ngOnInit() {
+    // const subscription = interval(1000).pipe(
+    //   map((val) => { return val * 2 }),
+    //   filter((val) => val % 4 !== 0)
+    // ).subscribe({
+    //   next: (value) => console.log(value),
+    // })
+
+    // this.destroyRef.onDestroy(() => {
+    //   subscription.unsubscribe()
+    // })
+
+    this.customInterval$.subscribe({            // subscribe to the custom observable!
+      next: (val) => console.log(val),              // execute next function
+    })
+    this.destroyRef.onDestroy(() => {
+      subscription.unsubscribe()
+    })
+  }
+}
+
+
+- this runs forever.. so added complete function
+export class AppComponent implements OnInit {
+  clickCount = signal(0)
+  clickCount$ = toObservable(this.clickCount)
+
+  interval$ = interval(1000)
+  intervalSignal = toSignal(this.interval$, {
+    initialValue: 0, manualCleanup: true
+  })
+
+  customInterval$ = new Observable((subscriber) => {
+    let timesExecuted = 0
+    const interval = setInterval(() => {
+      subscriber.error()                                // if any errors occur
+
+      if (timesExecuted > 3) {
+        clearInterval(interval)
+        subscriber.complete()                       // emit an event.. to clean up the subscription
+        return;
+      }
+      console.log("Emitting new value...");
+      subscriber.next({ message: "new value" })         // to listen for a value
+      timesExecuted = timesExecuted + 1
+    }, 2000)
+  })
+
+  private destroyRef = inject(DestroyRef)
+
+  ngOnInit() {
+    this.customInterval$.subscribe({            // subscribing to customInterval$
+      next: (val) => console.log(val),        
+      complete: () => console.log("COMPLETED"),
+      error: (err) => console.log("error: " + err)
+    })
+
+    const subscription = this.clickCount$.subscribe({
+      next: () => console.log(`button is clicked for ${this.clickCount()} times.`),
+    })
+
+    this.destroyRef.onDestroy(() => {
+      subscription.unsubscribe()
+    })
+  }
+  onClick() {
+    this.clickCount.update((prevCount) => prevCount + 1)
+  }
+}
