@@ -1,0 +1,51 @@
+BitBucket
+
+- we use this for continuous integration
+---
+	steps involved in this process are:
+	creating an angular project 
+	configuring build command in bitbucket pipelines
+	generate an artifacts folder for deployment 
+
+to create an angular project
+	- download node and npm
+	- install angular CLI [use: npm i -g @angular/cli] => to run angular code
+	- cd my-app and ng serve
+
+2. create a repo in bitbucket
+	- push the angular code into a branch
+
+3. create pipelines 
+	- select a template [node / PHP/ maven etc.,]
+
+if node selected, then add the following into it's template
+
+image: node <version>
+
+pipelines: 
+	default: 
+		- step: 
+			name: Installing dependencies
+			caches: 
+				- node
+			script: 
+				- npm install
+
+		- step: 
+			name: Lint check
+			caches: 
+				- node
+			script: 
+				- npm run lint
+
+		- step: 
+			name: Build
+			caches: 
+				- node
+			script: 
+				- npm run build
+			artifacts: 
+				- dist/**
+
+RESULT: 
+- this then will generate a dist-folder.. which has to be uploaded to "firebase", right?
