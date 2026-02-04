@@ -1,0 +1,26 @@
+<section class="chat-layout">
+  <!-- Messages panel -->
+  <main class="messages-panel">
+    <h3>Messages</h3>
+
+    <div class="messages">
+      @for(msg of messages$ | async; track msg.timestamp){
+      <div class="message">
+        <strong>{{msg.from}}:</strong>
+        {{msg.text}}
+        <small>({{msg.timestamp}})</small>
+      </div>
+      }
+    </div>
+  </main>
+
+  <!-- Input panel -->
+  <article class="input-panel">
+    <h3>Send Message</h3>
+
+    <form (ngSubmit)="sendMessage()">
+      <input type="text" placeholder="Type your message" name="messageText" [(ngModel)]="messageText" />
+      <button type="submit">Send</button>
+    </form>
+  </article>
+</section>
